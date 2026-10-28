@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aviary-gateway"
-version = "0.1.0"
+version = "0.2.0"
 description = "类 magpie 的本地 LLM 网关:协议互转(OpenAI/Anthropic)、路由组、故障切换、用量统计"
 readme = "README.md"
 requires-python = ">=3.10"

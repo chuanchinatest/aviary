@@ -9,7 +9,9 @@ import json
 import os
 import re
 
+from .masking import Masker
 from .routing import Router
+from .stickiness import StickySessions
 from .upstreams import Provider
 from .usage import UsageLog
 
@@ -41,7 +43,7 @@ def providers_from(raw: dict) -> list[Provider]:
     for p in raw.get("providers") or []:
         out.append(Provider(
             name=p["name"],
-            type=p.get("type", "openai"),
+            type=p.get("type", "openai"),  # openai | anthropic | gemini
             base_url=p["base_url"],
             api_key=p.get("api_key", ""),
             auth_header=p.get("auth", "x-api-key"),
@@ -64,6 +66,22 @@ def usage_log_from(raw: dict) -> UsageLog | None:
     log = raw.get("log") or {}
     path = log.get("file")
     return UsageLog(path) if path else None
+
+
+def keys_from(raw: dict):
+    from .limits import KeyRegistry
+    g = raw.get("gateway") or {}
+    return KeyRegistry(g.get("keys") or [], api_key=g.get("api_key", ""))
+
+
+def masker_from(raw: dict) -> Masker:
+    m = raw.get("masking") or {}
+    return Masker(extra_patterns=m.get("patterns"), never_mask=m.get("never_mask"))
+
+
+def sticky_from(raw: dict) -> StickySessions:
+    s = raw.get("stickiness") or {}
+    return StickySessions(ttl_seconds=float(s.get("ttl_seconds", 1800)))
 
 
 def gateway_from(raw: dict) -> dict:

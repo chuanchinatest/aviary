@@ -31,12 +31,15 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "serve":
         import uvicorn
+        from .config import keys_from, masker_from, sticky_from
         from .gateway import create_app
         from .usage import UsageLog
         g = gateway_from(raw)
         app = create_app(providers, router,
                          usage_log_from(raw) or UsageLog("data/usage.jsonl"),
-                         api_key=g["api_key"])
+                         keys=keys_from(raw), masker=masker_from(raw),
+                         middlewares=raw.get("middleware"),
+                         sticky=sticky_from(raw))
         host = args.host or g["host"]
         port = args.port or g["port"]
         print(f"aviary 网关已启动 http://{host}:{port}  (OpenAI: /v1/chat/completions,"

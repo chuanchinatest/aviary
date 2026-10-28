@@ -141,16 +141,52 @@ def make_anthropic_app() -> FastAPI:
     return app
 
 
+def make_gemini_app() -> FastAPI:
+    app = FastAPI(docs_url=None)
+
+    @app.post("/v1beta/models/{model_path:path}")
+    async def generate(model_path: str, body: dict, request: Request):
+        model = model_path.split(":")[0]
+        parts_out: list[dict] = []
+        for c in body.get("contents") or []:
+            for p in c.get("parts") or []:
+                if "text" in p and p["text"]:
+                    parts_out.append({"text": f"gemini-mock 收到:{p['text'][:20]}"})
+        parts_out = parts_out or [{"text": f"来自 {model} 的回答:你好!"}]
+        usage = {"promptTokenCount": 15, "candidatesTokenCount": 9}
+        if model_path.endswith(":streamGenerateContent") or \
+                request.query_params.get("alt") == "sse":
+            async def sse():
+                def ev(payload: dict) -> str:
+                    return "data: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
+                for part in parts_out:
+                    yield ev({"candidates": [{"content": {"role": "model",
+                            "parts": [part]}, "index": 0}], "modelVersion": model})
+                yield ev({"candidates": [{"content": {"role": "model", "parts": []},
+                        "finishReason": "STOP", "index": 0}],
+                        "usageMetadata": {**usage, "totalTokenCount": 24},
+                        "modelVersion": model})
+            return StreamingResponse(sse(), media_type="text/event-stream")
+        return JSONResponse({"candidates": [{"content": {"role": "model",
+                             "parts": parts_out}, "finishReason": "STOP", "index": 0}],
+                             "usageMetadata": {**usage, "totalTokenCount": 24},
+                             "modelVersion": model})
+    return app
+
+
 if __name__ == "__main__":
     openai_port = int(sys.argv[1]) if len(sys.argv) > 1 else 8850
     anthropic_port = int(sys.argv[2]) if len(sys.argv) > 2 else 8851
+    gemini_port = int(sys.argv[3]) if len(sys.argv) > 3 else 8852
 
     async def main():
         c1 = uvicorn.Server(uvicorn.Config(make_openai_app(), host="127.0.0.1",
                                            port=openai_port, log_level="warning"))
         c2 = uvicorn.Server(uvicorn.Config(make_anthropic_app(), host="127.0.0.1",
                                            port=anthropic_port, log_level="warning"))
-        await asyncio.gather(c1.serve(), c2.serve())
-    print(f"mock 上游:OpenAI http://127.0.0.1:{openai_port}/v1,"
-          f" Anthropic http://127.0.0.1:{anthropic_port}")
+        c3 = uvicorn.Server(uvicorn.Config(make_gemini_app(), host="127.0.0.1",
+                                           port=gemini_port, log_level="warning"))
+        await asyncio.gather(c1.serve(), c2.serve(), c3.serve())
+    print(f"mock 上游:OpenAI :{openai_port}/v1, Anthropic :{anthropic_port},"
+          f" Gemini :{gemini_port}/v1beta")
     asyncio.run(main())

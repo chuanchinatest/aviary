@@ -23,12 +23,17 @@ class UsageRecord:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     cost_usd: float | None = None
+    day: str = ""
+    gateway_key: str = ""
     error: str = ""
     extra: dict = field(default_factory=dict)
 
     def to_json(self) -> str:
+        if self.ts and not self.day:
+            import datetime as _dt
+            self.day = _dt.datetime.fromtimestamp(self.ts).strftime("%Y-%m-%d")
         return json.dumps({k: getattr(self, k) for k in (
-            f.name for f in fields(self)) if k != "extra"} | self.extra,
+            f.name for f in fields(self))} | self.extra,
             ensure_ascii=False)
 
 
@@ -44,7 +49,7 @@ class UsageLog:
             f.write(rec.to_json() + "\n")
 
     # ------------------------------------------------------------------ stats
-    def summarize(self) -> dict:
+    def _rows(self) -> list[dict]:
         rows = []
         if os.path.exists(self.path):
             with open(self.path, encoding="utf-8") as f:
@@ -55,6 +60,23 @@ class UsageLog:
                             rows.append(json.loads(line))
                         except json.JSONDecodeError:
                             continue
+        return rows
+
+    def summarize_key_day(self, key: str, day: str) -> dict:
+        """某网关密钥某天的成功用量:tokens 与 cost。记录里存 gateway_key。"""
+        tokens = 0
+        cost = 0.0
+        for r in self._rows():
+            if r.get("gateway_key") != key or r.get("status") != "ok":
+                continue
+            if r.get("day") != day:
+                continue
+            tokens += r.get("prompt_tokens", 0) + r.get("completion_tokens", 0)
+            cost += r.get("cost_usd") or 0.0
+        return {"tokens": tokens, "cost_usd": cost}
+
+    def summarize(self) -> dict:
+        rows = self._rows()
         out: dict = {"total_requests": len(rows),
                      "ok": sum(1 for r in rows if r.get("status") == "ok"),
                      "prompt_tokens": 0, "completion_tokens": 0,

@@ -9,6 +9,9 @@ from dataclasses import dataclass
 import httpx
 
 from .events import URequest
+from .gemini import (gemini_request_to_unified, gemini_response_to_unified,
+                     unified_to_gemini_request)
+from .gemini_stream import gemini_sse_to_universe
 from .streaming import anthropic_sse_to_universe, openai_sse_to_universe
 
 
@@ -35,7 +38,9 @@ class Provider:
 
     def headers(self) -> dict:
         h: dict = {}
-        if self.type == "anthropic":
+        if self.type == "gemini":
+            h["x-goog-api-key"] = self.api_key
+        elif self.type == "anthropic":
             h["anthropic-version"] = "2007-01-25"  # 固定 API 版本,可被 extra_headers 覆盖
             h[self.auth_header] = self.api_key
             if self.auth_header != "Authorization":
@@ -73,6 +78,10 @@ class Upstream:
             body = unified_to_anthropic_request(u)
             data = await self._post("/v1/messages", body)
             return anthropic_response_to_unified(data)[1]
+        if self.p.type == "gemini":
+            body = unified_to_gemini_request(u)
+            data = await self._post(f"/v1beta/models/{u.model}:generateContent", body)
+            return gemini_response_to_unified(data)[1]
         body = unified_to_openai_request(u)
         body["stream"] = False
         data = await self._post("/chat/completions", body)
@@ -84,7 +93,13 @@ class Upstream:
         from .translate import unified_to_anthropic_request, unified_to_openai_request
         if self.p.type == "anthropic":
             body = unified_to_anthropic_request(u)
+            body["stream"] = True
             path = "/v1/messages"
+        elif self.p.type == "gemini":
+            body = unified_to_gemini_request(u)
+            path = f"/v1beta/models/{u.model}:streamGenerateContent"
+            if "?" not in path:
+                path += "?alt=sse"
         else:
             body = unified_to_openai_request(u)
             body["stream"] = True
@@ -94,6 +109,8 @@ class Upstream:
         lines = _sse_lines(resp)
         if self.p.type == "anthropic":
             return anthropic_sse_to_universe(lines)
+        if self.p.type == "gemini":
+            return gemini_sse_to_universe(lines)
         return openai_sse_to_universe(lines)
 
     # ------------------------------------------------------------------ internals
@@ -118,9 +135,25 @@ class Upstream:
     async def list_models(self) -> list[str]:
         if self.p.models is not None:
             return list(self.p.models)
+        if self.p.type == "gemini":
+            try:
+                data = await self._get("/v1beta/models")
+                return [m["name"].split("/")[-1] for m in data.get("models", [])
+                        if m.get("name")]
+            except Exception:
+                return []
         path = "/models" if self.p.type == "openai" else "/v1/models"
         try:
             data = (await self._post(path, {})).get("data") or []
             return [m["id"] for m in data if isinstance(m, dict) and m.get("id")]
         except Exception:
             return []
+
+    async def _get(self, path: str) -> dict:
+        try:
+            resp = await self._http.get(path)
+        except httpx.HTTPError as e:
+            raise UpstreamError(None, f"{type(e).__name__}: {e}") from e
+        if resp.status_code >= 400:
+            raise UpstreamError(resp.status_code, resp.text[:300])
+        return resp.json()
