@@ -5,4 +5,4 @@
 上游报错时自动切换 [yetone/magpie README]。
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.1"

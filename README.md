@@ -189,12 +189,16 @@ Gemini CLI  ─ Gemini  ──┤  翻译·路由·记账·     ├─ Gemini �
 - `aviary/translate.py` — 请求/响应双向翻译(messages、system、tools、stop_reason、usage)
 - `aviary/streaming.py` — SSE 双向翻译(内部统一事件模型,组合走同一层)
 - `aviary/responses_api.py` / `aviary/gemini.py` / `aviary/gemini_stream.py` — Responses 与 Gemini 客户端协议
+- `aviary/protocols.py` — **客户端协议注册表**:每种协议的 解析/回包/SSE 三方向一处注册,加协议零改动
+- `aviary/upstreams.py` — 上游适配注册表(openai/anthropic/gemini)+ 统一 HTTP 客户端
 - `aviary/routing.py`  — 寻址与路由组(order / rotate / usage)
 - `aviary/stickiness.py` — 会话粘性
 - `aviary/masking.py`  — 隐私脱敏与流式还原
 - `aviary/middleware.py` — 请求中间件(参数改写、系统提示注入)
 - `aviary/limits.py`   — 多密钥与每日配额
-- `aviary/gateway.py`  — FastAPI 端点、故障切换与 Web 控制台
+- `aviary/pipeline.py` — **请求管线**:鉴权→配额→中间件→路由→粘性→脱敏→逐候选故障切换
+- `aviary/gateway.py`  — FastAPI 端点装配(纯装配,不含业务逻辑)
+- `aviary/dashboard.py` — Web 控制台页面
 - `aviary/usage.py`    — JSONL 用量日志与统计
 
 ### 与 magpie 的差距( roadmap )

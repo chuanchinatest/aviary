@@ -9,7 +9,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 
 FINISH_MAP_TO_OPENAI = {
     "end_turn": "stop",
@@ -59,3 +60,30 @@ def usage_event(p: int, c: int) -> tuple:
 
 def end_event(reason: str | None) -> tuple:
     return ("end", FINISH_MAP_TO_OPENAI.get(reason or "stop", "stop"))
+
+
+class EventTap:
+    """包一层事件流,顺路收集 finish_reason 与 usage 供记账。"""
+
+    def __init__(self, it: AsyncIterator[tuple]):
+        self._it = it
+        self.finish = "stop"
+        self.usage: dict = {}
+
+    def __aiter__(self) -> EventTap:
+        return self
+
+    async def __anext__(self) -> tuple:
+        ev = await self._it.__anext__()
+        if ev[0] == "usage":
+            self.usage = {"prompt_tokens": ev[1], "completion_tokens": ev[2]}
+        elif ev[0] == "end":
+            self.finish = ev[1]
+        return ev
+
+
+async def chain(first: tuple, rest: AsyncIterator[tuple]) -> AsyncIterator[tuple]:
+    """把已取出的第一个事件接回流的前面。"""
+    yield first
+    async for ev in rest:
+        yield ev

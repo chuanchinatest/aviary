@@ -27,7 +27,7 @@ async def gemini_sse_to_universe(lines: AsyncIterator[str]) -> AsyncIterator[tup
         for cand in data.get("candidates") or []:
             parts = (cand.get("content") or {}).get("parts") or []
             for p in parts:
-                if "text" in p and p["text"]:
+                if p.get("text"):
                     yield ("text", p["text"])
                 elif "functionCall" in p:
                     fc = p["functionCall"]

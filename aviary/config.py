@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import dataclass
 
 from .masking import Masker
 from .routing import Router
@@ -84,7 +85,15 @@ def sticky_from(raw: dict) -> StickySessions:
     return StickySessions(ttl_seconds=float(s.get("ttl_seconds", 1800)))
 
 
-def gateway_from(raw: dict) -> dict:
+@dataclass(frozen=True)
+class GatewayConfig:
+    host: str = "127.0.0.1"
+    port: int = 8787
+    api_key: str = ""
+
+
+def gateway_from(raw: dict) -> GatewayConfig:
     g = raw.get("gateway") or {}
-    return {"host": g.get("host", "127.0.0.1"), "port": int(g.get("port", 8787)),
-            "api_key": g.get("api_key", "")}
+    return GatewayConfig(host=g.get("host", "127.0.0.1"),
+                         port=int(g.get("port", 8787)),
+                         api_key=g.get("api_key", ""))

@@ -12,8 +12,7 @@ import argparse
 import asyncio
 import sys
 
-from .config import (gateway_from, load_raw, providers_from, router_from,
-                     usage_log_from)
+from .config import load_raw, providers_from, router_from, usage_log_from
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -31,19 +30,21 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "serve":
         import uvicorn
-        from .config import keys_from, masker_from, sticky_from
+
+        from .config import gateway_from, keys_from, masker_from, sticky_from
         from .gateway import create_app
         from .usage import UsageLog
-        g = gateway_from(raw)
+        gw = gateway_from(raw)
         app = create_app(providers, router,
                          usage_log_from(raw) or UsageLog("data/usage.jsonl"),
                          keys=keys_from(raw), masker=masker_from(raw),
                          middlewares=raw.get("middleware"),
                          sticky=sticky_from(raw))
-        host = args.host or g["host"]
-        port = args.port or g["port"]
-        print(f"aviary 网关已启动 http://{host}:{port}  (OpenAI: /v1/chat/completions,"
-              f" Anthropic: /v1/messages)")
+        host = args.host or gw.host
+        port = args.port or gw.port
+        print(f"aviary 网关已启动 http://{host}:{port}  "
+              f"(OpenAI: /v1/chat/completions, Anthropic: /v1/messages, "
+              f"Responses: /v1/responses, Gemini: /v1beta/models/<m>:generateContent)")
         uvicorn.run(app, host=host, port=port, log_level="info")
         return 0
 
