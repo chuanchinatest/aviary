@@ -1,0 +1,37 @@
+# aviary 配置示例 —— 敏感值可用环境变量:${DEEPSEEK_KEY}
+gateway:
+  host: 127.0.0.1
+  port: 8787
+  api_key: ""                 # 留空不鉴权;设置后客户端需带 Authorization: Bearer <key>
+  default_provider: deepseek  # 裸模型名走这里
+
+log:
+  file: data/usage.jsonl      # 每次调用一行 JSONL
+
+providers:
+  - name: deepseek
+    type: openai              # openai 兼容端点(vLLM/Ollama/OpenRouter/硅基流动都是这一类)
+    base_url: https://api.deepseek.com/v1
+    api_key: ${DEEPSEEK_KEY}
+    price: {input: 0.27, output: 1.1}   # $/1M token,用于成本估算,可省略
+    # models: [deepseek-chat]           # openai 型可省略,自动拉 /models
+
+  - name: claude
+    type: anthropic
+    base_url: https://api.anthropic.com
+    api_key: ${ANTHROPIC_KEY}
+    models: [claude-sonnet-4-5]
+    price: {input: 3.0, output: 15.0}
+
+# 也可以把某个 OpenAI 兼容中转站配成 anthropic 协议的反向场景:
+#   auth: Authorization      # 中转站若只认 Bearer 头,用这一行
+
+groups:
+  - name: daily-coding        # agent 里写 model: group/daily-coding
+    mode: order               # order=故障切换 | rotate=轮换 | usage=最少使用优先
+    members:
+      - deepseek/deepseek-chat
+      - claude/claude-sonnet-4-5
+
+model_map:                    # 别名:agent 配置里写 model: fast 即可
+  fast: deepseek/deepseek-chat

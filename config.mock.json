@@ -1,0 +1,16 @@
+{
+  "gateway": {"host": "127.0.0.1", "port": 8787, "api_key": "", "default_provider": "mockopenai"},
+  "log": {"file": "data/usage.jsonl"},
+  "providers": [
+    {"name": "mockopen", "type": "openai", "base_url": "http://127.0.0.1:8850/v1",
+     "api_key": "mock", "models": ["mock-chat", "mock-flaky"],
+     "price": {"input": 0.5, "output": 1.5}},
+    {"name": "mockanthropic", "type": "anthropic", "base_url": "http://127.0.0.1:8851",
+     "api_key": "mock", "models": ["claude-mock"]}
+  ],
+  "groups": [
+    {"name": "daily", "mode": "order",
+     "members": ["mockopen/mock-flaky", "mockanthropic/claude-mock"]}
+  ],
+  "model_map": {"fast": "mockopen/mock-chat"}
+}
