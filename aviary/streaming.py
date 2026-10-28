@@ -128,7 +128,6 @@ async def universe_to_anthropic_sse(
         return f"event: {name}\ndata: " + json.dumps(payload, ensure_ascii=False) + "\n\n"
 
     block_index = 0          # 当前内容块的 anthropic index
-    tool_index = -1          # 第几个 tool_use 块
     text_open = False
     open_tool_blocks: dict[int, int] = {}  # 统一 tool index → anthropic block index
     usage = {"input_tokens": 0, "output_tokens": 0}
